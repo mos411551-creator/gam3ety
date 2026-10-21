@@ -1,82 +1,56 @@
 name: Build Gam3ety APK
-
 on:
   push:
     branches: [ main, master ]
   workflow_dispatch:
-
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
       - uses: actions/setup-java@v4
         with:
           distribution: 'zulu'
           java-version: '17'
-
       - uses: subosito/flutter-action@v2
         with:
           flutter-version: '3.22.0'
-
       - name: Fix NDK
         run: |
           echo "y" | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --install "ndk;25.1.8937393"
           echo "ANDROID_NDK_HOME=$ANDROID_HOME/ndk/25.1.8937393" >> $GITHUB_ENV
-
-      - name: Create App Files
+      - name: Create App
         run: |
           flutter create . --platforms=android --org com.gam3ety.app --project-name gam3ety --overwrite
+          mkdir -p lib/models
+          cat > lib/models/gam3eya.dart << 'ENDDART'
+          class Participant { String name; int dailyAmount; Participant({required this.name, required this.dailyAmount}); }
+          class Share { String id; String type; String? ownerName; int totalAmount; int payoutOrder; List<Participant> participants; Share({required this.id, required this.type, this.ownerName, required this.totalAmount, required this.payoutOrder, this.participants = const []}); }
+          class Gam3eya { String id; String name; int amount; int duration; List<Share> shares; Gam3eya({required this.id, required this.name, required this.amount, required this.duration, this.shares = const []}); int get totalPool => amount * duration; }
+          ENDDART
           
-          mkdir -p lib/models assets
-          
-          cat > pubspec.yaml << 'EOF'
-          name: gam3ety
-          description: تطبيق جمعيتي
-          version: 1.0.0+1
-          environment:
-            sdk: '>=3.0.0 <4.0.0'
-          dependencies:
-            flutter:
-              sdk: flutter
-            shared_preferences: ^2.2.2
-          flutter:
-            uses-material-design: true
-          EOF
-
-          cat > lib/models/gam3eya.dart << 'EOF'
-          class Participant {
-            String name; int dailyAmount;
-            Participant({required this.name, required this.dailyAmount});
-          }
-          class Share {
-            String id; String type; String? ownerName; int totalAmount; int payoutOrder;
-            List<Participant> participants;
-            Share({required this.id, required this.type, this.ownerName, required this.totalAmount, required this.payoutOrder, this.participants = const []});
-          }
-          class Gam3eya {
-            String id; String name; String type; int amount; int duration; DateTime startDate; List<Share> shares;
-            Gam3eya({required this.id, required this.name, required this.type, required this.amount, required this.duration, required this.startDate, this.shares = const []});
-            int get totalPool => amount * duration;
-          }
-          EOF
-
-          cat > lib/main.dart << 'EOF'
+          cat > lib/main.dart << 'ENDDART'
           import 'package:flutter/material.dart';
           import 'models/gam3eya.dart';
-          void main() => runApp(Gam3etyApp());
+          void main() => runApp(const Gam3etyApp());
           class Gam3etyApp extends StatelessWidget {
-            @override Widget build(BuildContext context) {
-              return MaterialApp(title: 'جمعيتي', debugShowCheckedModeBanner: false, home: HomeScreen());
+            const Gam3etyApp({super.key});
+            @override
+            Widget build(BuildContext context) {
+              return MaterialApp(title: 'جمعيتي', debugShowCheckedModeBanner: false, home: const HomeScreen());
             }
           }
-          class HomeScreen extends StatefulWidget { @override _HomeScreenState createState() => _HomeScreenState(); }
+          class HomeScreen extends StatefulWidget {
+            const HomeScreen({super.key});
+            @override
+            State<HomeScreen> createState() => _HomeScreenState();
+          }
           class _HomeScreenState extends State<HomeScreen> {
-            List<Gam3eya> gam3eyat = [];
-            @override void initState() {
+            List<Gam3eya> list = [];
+            @override
+            void initState() {
               super.initState();
-              gam3eyat.add(Gam3eya(id: '1', name: 'جمعية 100 يوم', type: 'daily', amount: 100, duration: 100, startDate: DateTime.now(), shares: [
+              list.add(Gam3eya(id: '1', name: 'جمعية 100 يوم', amount: 100, duration: 100, shares: [
                 Share(id: 's1', type: 'single', ownerName: 'مصطفى', totalAmount: 100, payoutOrder: 1),
                 Share(id: 's2', type: 'shared', totalAmount: 100, payoutOrder: 2, participants: [
                   Participant(name: 'أحمد', dailyAmount: 50),
@@ -85,32 +59,59 @@ jobs:
                 ]),
               ]));
             }
-            @override Widget build(BuildContext context) {
+            @override
+            Widget build(BuildContext context) {
               return Scaffold(
-                appBar: AppBar(title: Text('جمعيتي - 50/30/20'), backgroundColor: Color(0xFF065f46)),
-                body: ListView.builder(itemCount: gam3eyat.length, itemBuilder: (context, i) {
-                  final g = gam3eyat[i];
-                  return Card(margin: EdgeInsets.all(12), child: Padding(padding: EdgeInsets.all(16), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                    Text(g.name, style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-                    Text('${g.amount}ج × ${g.duration} = ${g.totalPool}ج'),
-                    Divider(),
-                    ...g.shares.map((s) {
-                      if (s.type == 'single') return ListTile(title: Text(s.ownerName ?? ''), subtitle: Text('دور ${s.payoutOrder}'));
-                      return Container(padding: EdgeInsets.all(12), decoration: BoxDecoration(border: Border.all(color: Colors.amber, width: 2), borderRadius: BorderRadius.circular(12), color: Color(0xFFFFFBEB)), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                        Text('🤝 سهم مشترك ${s.totalAmount}ج - دور ${s.payoutOrder}', style: TextStyle(fontWeight: FontWeight.bold)),
-                        ...s.participants.map((p) => Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [Text('${p.name}: ${p.dailyAmount}ج'), Text('يقبض ${p.dailyAmount * g.duration}ج', style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF065f46)))])),
-                      ]));
-                    }),
-                  ]))),
-                }),
+                appBar: AppBar(title: const Text('جمعيتي'), backgroundColor: const Color(0xFF065f46)),
+                body: ListView.builder(
+                  itemCount: list.length,
+                  itemBuilder: (context, idx) {
+                    final g = list[idx];
+                    return Card(
+                      margin: const EdgeInsets.all(12),
+                      child: Padding(
+                        padding: const EdgeInsets.all(16),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(g.name, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+                            Text('${g.amount}ج × ${g.duration} = ${g.totalPool}ج'),
+                            const Divider(),
+                            for (var s in g.shares)
+                              if (s.type == 'single')
+                                ListTile(title: Text(s.ownerName ?? ''), subtitle: Text('دور ${s.payoutOrder}'))
+                              else
+                                Container(
+                                  padding: const EdgeInsets.all(12),
+                                  decoration: BoxDecoration(border: Border.all(color: Colors.amber, width: 2), borderRadius: BorderRadius.circular(12)),
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text('سهم مشترك ${s.totalAmount}ج - دور ${s.payoutOrder}', style: const TextStyle(fontWeight: FontWeight.bold)),
+                                      const SizedBox(height: 8),
+                                      for (var p in s.participants)
+                                        Row(
+                                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                          children: [
+                                            Text('${p.name}: ${p.dailyAmount}ج'),
+                                            Text('يقبض ${p.dailyAmount * g.duration}ج', style: const TextStyle(fontWeight: FontWeight.bold)),
+                                          ],
+                                        ),
+                                    ],
+                                  ),
+                                ),
+                          ],
+                        ),
+                      ),
+                    );
+                  },
+                ),
               );
             }
           }
-          EOF
-
+          ENDDART
       - run: flutter pub get
       - run: flutter build apk --release
-
       - uses: actions/upload-artifact@v4
         with:
           name: gam3ety-apk
